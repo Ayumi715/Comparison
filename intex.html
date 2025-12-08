@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>方程式の解法の比較</title>
+    <link rel="stylesheet" href="intex.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+ <style>
+    /* ★ ログ表示エリアのスタイル ★ */
+        .log-area {
+            flex: 1;
+            max-width: 450px;
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+            max-height: 500px;
+            overflow-y: auto; /* スクロール可能にする */
+        }
+        .log-area table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .log-area th, .log-area td {
+            border: 1px solid #ccc;
+            padding: 5px;
+            text-align: right;
+        }
+        .log-area th {
+            background-color: #f0f0f0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<h1>2分法とニュートン法_比較シミュレータ</h1>
+<hr>
+
+<div class="container">
+    <div class="input-area">
+        <button id="startButton" class="button-large" style="font-size: 30px; width: 100px; height: 60px;">start</button>
+        <button id="clearButton" class="button-large" style="font-size: 30px; width: 100px; height: 60px;">clear</button>
+        <br>
+        <label>f(x)=<input type="text" id="formulaInput" placeholder="例: x^2-2x-3"></label>
+        <br><br>
+
+        【2分法用 初期値】
+        <div class="info-box bisection-box">
+            aの値：<input type="text" id="bisectionA" class="small-input">
+            <br>
+            bの値：<input type="text" id="bisectionB" class="small-input">
+            <br>
+            計算回数：<span id="bisectionIterations"></span>
+            <br>
+            計算時間：<span id="bisectionTime"></span>
+            <br>
+            xの値：<span id="bisectionResultX"></span>
+        </div>
+        <br>
+
+        【ニュートン法用 初期値】
+        <div class="info-box newton-box">
+            xの値：<input type="text" id="newtonInitialGuess" class="small-input">
+            <br>
+            x<sub>n+1</sub>の値：<span id="newtonNextX"></span>
+            <br>
+            接線の値：<span id="newtonTangent"></span>
+            <br>
+            計算回数：<span id="newtonIterations"></span>
+            <br>
+            計算時間：<span id="newtonTime"></span>
+            <br>
+            xの値：<span id="newtonResultX"></span>
+        </div>
+    </div>
+
+    <div class="graph-area">
+        <div class="graph-container">
+            <h2>2分法の結果</h2>
+            <canvas id="quadraticChart1"></canvas>
+        </div>
+
+        <div class="graph-container">
+            <h2>ニュートン法の結果</h2>
+            <canvas id="quadraticChart2"></canvas>
+        </div>
+    </div>
+</div>
+
+<hr>
+<h2>反復計算ログ</h2>
+<div class="container">
+    <div class="log-area" id="bisectionLog">
+        <h3>2分法ログ</h3>
+    </div>
+    <div class="log-area" id="newtonLog">
+        <h3>ニュートン法ログ</h3>
+    </div>
+</div>
+
+<script>
+  let chart1; // 2分法グラフインスタンス
+  let chart2; // ニュートン法グラフインスタンス
+
+  // 許容誤差と最大反復回数 (ログデータ表示のために再定義)
+  const TOLERANCE = 1e-2; 
+  const MAX_ITERATIONS = 100;
+  
+  const FORMAT_DECIMALS = 2; // 結果表示の小数点以下の桁数
+  const LOG_DECIMALS = 2;    // ログ表示の小数点以下の桁数
+
+  // --- 計算ロジックで使用する関数と定数を再定義 ---
+  
+  function createFunction(a, b, c) {
+      return function(x) {
+          return a * x * x + b * x + c;
+      };
+  }
+
+  function createDerivative(a, b) {
+      return function(x) {
+          return 2 * a * x + b;
+      };
+  }
+
+  function calculateBisection(aCoeff, bCoeff, cCoeff, a, b) {
+      const start = performance.now();
+      const f = createFunction(aCoeff, bCoeff, cCoeff);
+
+      if (f(a) * f(b) >= 0) {
+          return "初期区間で符号が異なりません。根が見つからない可能性があります。";
+      }
+
+      let iterations = 0;
+      let c = 0;
+      const logData = []; 
+
+      while ((b - a) >= TOLERANCE && iterations < MAX_ITERATIONS) {
+          c = (a + b) / 2;
+          
+          logData.push({ 
+              i: iterations + 1,
+              a: a,
+              b: b,
+              c: c,
+              fc: f(c)
+          });
+          
+          if (f(c) === 0.0) break;
+          
+          if (f(c) * f(a) < 0) {
+              b = c;
+          } else {
+              a = c;
+          }
+          iterations++;
+      }
+
+      const end = performance.now();
+      return {
+          root: c,
+          iterations: iterations,
+          time: (end - start).toFixed(FORMAT_DECIMALS),
+          finalA: a,
+          finalB: b,
+          log: logData 
+      };
+  }
+
+  function calculateNewton(aCoeff, bCoeff, cCoeff, x0) {
+      const start = performance.now();
+      const f = createFunction(aCoeff, bCoeff, cCoeff);
+      const f_prime = createDerivative(aCoeff, bCoeff);
+      
+      let x = x0;
+      let iterations = 0;
+      let x_new = x;
+      const logData = []; 
+      
+      logData.push({
+          i: 0,
+          xn: x,
+          fxn: f(x),
+          fpxn: f_prime(x),
+          xnext: null 
+      });
+
+      while (iterations < MAX_ITERATIONS) {
+          const fx = f(x);
+          const fpx = f_prime(x);
+
+          if (Math.abs(x) > 1e10) { // 発散チェックをより厳密に
+              return "計算値が発散したか、極端に大きな値になりました。初期値を変えてください。";
+          }
+          
+          if (Math.abs(fpx) < 1e-10) {
+              return "導関数の値が小さすぎます（接線の傾きがほぼゼロ）。収束しない可能性があります。";
+          }
+          
+          x_new = x - (fx / fpx);
+
+          logData[iterations].xnext = x_new; 
+
+          if (Math.abs(x_new - x) < TOLERANCE) break;
+          
+          x = x_new;
+          iterations++;
+
+          logData.push({
+              i: iterations,
+              xn: x,
+              fxn: f(x),
+              fpxn: f_prime(x),
+              xnext: null 
+          });
+      }
+
+      const end = performance.now();
+      
+      if (iterations === MAX_ITERATIONS) {
+          return "最大反復回数に達しましたが、収束しませんでした。";
+      }
+
+      return {
+          root: x_new,
+          iterations: iterations,
+          time: (end - start).toFixed(FORMAT_DECIMALS),
+          nextX: x_new,
+          tangent: f_prime(x_new), // 最終的な接線の傾き
+          log: logData 
+      };
+  }
+
+  // --- parseFormula は変更なし ---
+  function parseFormula(formula) {
+    const normalized = formula.replace(/\s+/g, '') 
+                              .replace(/−/g, '-') 
+                              .replace(/x²/g, 'x^2'); 
+    const regex = /^([+-]?[\d.]*)x\^2([+-][\d.]*)?x?([+-][\d.]+)?$/;
+    const match = normalized.match(regex);
+
+    if (match) {
+        let a = parseFloat(match[1] || (normalized.startsWith('-') ? '-1' : '1'));
+        let b = parseFloat(match[2] || '0');
+        let c = parseFloat(match[3] || '0');
+
+        if (match[2] && !match[2].includes('x') && match[3] === undefined) {
+             c = b;
+             b = 0;
+        }
+
+        return { a, b, c };
+    }
+
+    const linearRegex = /^([+-]?[\d.]*)x([+-][\d.]+)?$/;
+    const linearMatch = normalized.match(linearRegex);
+    if (linearMatch) {
+        const b = parseFloat(linearMatch[1] || (normalized.startsWith('-') ? '-1' : '1'));
+        const c = parseFloat(linearMatch[2] || '0');
+        return { a: 0, b: b, c: c };
+    }
+
+    const constantRegex = /^([+-]?[\d.]+)$/;
+    const constantMatch = normalized.match(constantRegex);
+    if (constantMatch) {
+        const c = parseFloat(constantMatch[1]);
+        return { a: 0, b: 0, c: c };
+    }
+
+    return null; 
+  }
+
+  /**
+   * グラフを描画する共通関数
+   */
+  function drawGraph(canvasId, a, b, c, chartInstanceRef, titlePrefix, lineColor, backgroundColor) {
+    const xValues = [];
+    const yValues = [];
+    
+    // データ生成範囲を X:-100 から 100 に、刻み幅 10 で設定
+    for (let x = -100; x <= 100; x += 10) { 
+      xValues.push(x);
+      yValues.push(a * x * x + b * x + c);
+    }
+
+    const ctx = document.getElementById(canvasId).getContext('2d');
+
+    // 既存のグラフがあれば破棄（安定していたロジックをそのまま使用）
+    if (chartInstanceRef.value) { 
+      chartInstanceRef.value.destroy();
+    }
+
+    // カスタムプラグインを定義して背景色を設定
+    const backgroundPlugin = {
+      id: 'customCanvasBackgroundColor',
+      beforeDraw: (chart, args, options) => {
+        const {ctx} = chart;
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = options.color || '#fff'; // デフォルトは白
+        ctx.fillRect(0, 0, chart.width, chart.height);
+        ctx.restore();
+      }
+    };
+
+    // 新しいグラフを作成
+    const newChart = new Chart(ctx, { // chartInstanceRef.value に代入
+      type: 'line',
+      data: {
+        labels: xValues,
+        datasets: [{
+          label: `${titlePrefix} y = ${a}x² ${b >= 0 ? '+' : ''}${b}x ${c >= 0 ? '+' : ''}${c}`,
+          data: yValues,
+          borderColor: lineColor,
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 0 // 点を描画しない
+        }]
+      },
+      options: {
+        responsive: false,
+        maintainAspectRatio: false, // canvasのサイズに合わせる
+        scales: {
+          x: {
+            title: { display: true, text: 'x' },
+            min: -100,
+            max: 100,
+            //ticks: {
+              // X軸の目盛りを10刻みに設定を有効化
+              //stepSize: 10, 
+              //callback: function(value, index, values) {
+                //return value.toFixed(0);
+              //}
+            //},
+            grid: {
+              borderColor: 'black',
+              borderWidth: 1,
+              drawOnChartArea: true,
+              drawTicks: true,
+              tickLength: 8,
+              // 10の倍数の線は濃くする
+              color: (context) => context.tick.value === 0 ? 'black' : (context.tick.value % 10 === 0 ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.1)')
+            }
+          },
+          y: {
+            title: { display: true, text: 'y' },
+            min: -1000,
+            max: 1000,
+            //ticks: {
+              // ★ Y軸の目盛りを100刻みに設定を有効化 ★ (広い範囲に対応)
+              //stepSize: 100,
+              //callback: function(value, index, values) {
+                //return value.toFixed(0);
+              //}
+            //},
+            grid: {
+              borderColor: 'black',
+              borderWidth: 1,
+              drawOnChartArea: true,
+              drawTicks: true,
+              tickLength: 8,
+              // 100の倍数の線は濃くする
+              color: (context) => context.tick.value === 0 ? 'black' : (context.tick.value % 100 === 0 ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.1)')
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true
+          },
+          // カスタム背景プラグインのオプションを設定
+          customCanvasBackgroundColor: {
+            color: backgroundColor // グラフ描画領域の背景色
+          }
+        }
+      },
+      // プラグインを登録
+      plugins: [backgroundPlugin]
+    });
+    
+    chartInstanceRef.value = newChart;
+    return newChart;
+  }
+
+  // --- ログ表示関数は変更なし ---
+  function displayBisectionLog(logData) {
+      let html = '<h3>2分法ログ</h3>';
+      if (logData.length === 0) {
+          html += '<p>ログデータなし</p>';
+      } else {
+          html += '<table><thead><tr><th>Step</th><th>a</th><th>b</th><th>c (中心の値)</th><th>f(c)</th></tr></thead><tbody>';
+          
+          logData.forEach((step, index) => {
+              const isLast = index === logData.length - 1;
+              const rowClass = isLast ? ' class="final-step"' : '';
+              
+              html += `<tr${rowClass}>
+                          <td>${step.i}</td>
+                          <td>${step.a.toFixed(LOG_DECIMALS)}</td>
+                          <td>${step.b.toFixed(LOG_DECIMALS)}</td>
+                          <td>${step.c.toFixed(LOG_DECIMALS)}</td>
+                          <td>${step.fc.toFixed(LOG_DECIMALS)}</td>
+                      </tr>`;
+          });
+          html += '</tbody></table>';
+      }
+      document.getElementById('bisectionLog').innerHTML = html;
+  }
+
+  function displayNewtonLog(logData) {
+      let html = '<h3>ニュートン法ログ</h3>';
+      if (logData.length === 0) {
+          html += '<p>ログデータなし</p>';
+      } else {
+          html += '<table><thead><tr><th>Step</th><th>x<sub>n</sub></th><th>f(x<sub>n</sub>)</th><th>f\'(x<sub>n</sub>)</th><th>x<sub>n+1</sub></th></tr></thead><tbody>';
+          
+          logData.forEach((step, index) => {
+              const xnext_val = step.xnext === null ? step.xn : step.xnext; 
+              
+              const isLast = index === logData.length - 1;
+              const rowClass = isLast ? ' class="final-step"' : '';
+
+              html += `<tr${rowClass}>
+                          <td>${step.i}</td>
+                          <td>${step.xn.toFixed(LOG_DECIMALS)}</td>
+                          <td>${step.fxn.toFixed(LOG_DECIMALS)}</td>
+                          <td>${step.fpxn.toFixed(LOG_DECIMALS)}</td>
+                          <td>${xnext_val.toFixed(LOG_DECIMALS)}</td>
+                      </tr>`;
+          });
+          html += '</tbody></table>';
+      }
+      document.getElementById('newtonLog').innerHTML = html;
+  }
+  
+  // --- イベントリスナーの修正 ---
+
+  const chartRefs = {
+      chart1: null,
+      chart2: null
+  };
+
+  document.getElementById('startButton').addEventListener('click', () => {
+    const formula = document.getElementById('formulaInput').value;
+    const coeffs = parseFormula(formula);
+
+    document.getElementById('bisectionLog').innerHTML = '<h3>2分法ログ</h3><p>計算中...</p>';
+    document.getElementById('newtonLog').innerHTML = '<h3>ニュートン法ログ</h3><p>計算中...</p>';
+
+
+    if (!coeffs) {
+      alert('数式の形式が正しくありません。例: x^2-2x-3');
+      return;
+    }
+
+    // グラフ描画
+    chartRefs.chart1 = drawGraph('quadraticChart1', coeffs.a, coeffs.b, coeffs.c, { value: chartRefs.chart1 }, '2分法:', 'blue', '#E0F2F7');
+    chartRefs.chart2 = drawGraph('quadraticChart2', coeffs.a, coeffs.b, coeffs.c, { value: chartRefs.chart2 }, 'ニュートン法:', 'red', '#E8F8F5');
+    
+    // 2分法計算
+    const bA = parseFloat(document.getElementById('bisectionA').value);
+    const bB = parseFloat(document.getElementById('bisectionB').value);
+    
+    if (isNaN(bA) || isNaN(bB)) {
+        alert('2分法の初期値 a, b を入力してください。');
+        document.getElementById('bisectionLog').innerHTML = '<h3>2分法ログ</h3>';
+        document.getElementById('newtonLog').innerHTML = '<h3>ニュートン法ログ</h3>';
+        return;
+    }
+
+    const bisectionResult = calculateBisection(coeffs.a, coeffs.b, coeffs.c, bA, bB);
+
+    if (typeof bisectionResult === 'string') {
+        alert(`2分法エラー: ${bisectionResult}`);
+        document.getElementById('bisectionResultX').textContent = bisectionResult;
+        document.getElementById('bisectionIterations').textContent = '---';
+        document.getElementById('bisectionTime').textContent = '---';
+        displayBisectionLog([]); 
+    } else {
+        document.getElementById('bisectionIterations').textContent = bisectionResult.iterations;
+        document.getElementById('bisectionTime').textContent = `${bisectionResult.time} ms`;
+        document.getElementById('bisectionResultX').textContent = bisectionResult.root.toFixed(FORMAT_DECIMALS);
+        displayBisectionLog(bisectionResult.log); 
+    }
+
+    // ニュートン法計算
+    const nX0 = parseFloat(document.getElementById('newtonInitialGuess').value);
+
+    if (isNaN(nX0)) {
+        alert('ニュートン法の初期推測値 x を入力してください。');
+        document.getElementById('bisectionLog').innerHTML = '<h3>2分法ログ</h3>';
+        document.getElementById('newtonLog').innerHTML = '<h3>ニュートン法ログ</h3>';
+        return;
+    }
+
+    const newtonResult = calculateNewton(coeffs.a, coeffs.b, coeffs.c, nX0);
+    
+    if (typeof newtonResult === 'string') {
+        alert(`ニュートン法エラー: ${newtonResult}`);
+        document.getElementById('newtonResultX').textContent = newtonResult;
+        document.getElementById('newtonNextX').textContent = '---';
+        document.getElementById('newtonTangent').textContent = '---';
+        document.getElementById('newtonIterations').textContent = '---';
+        document.getElementById('newtonTime').textContent = '---';
+        displayNewtonLog([]); 
+    } else {
+        document.getElementById('newtonNextX').textContent = newtonResult.nextX.toFixed(FORMAT_DECIMALS);
+        document.getElementById('newtonTangent').textContent = newtonResult.tangent.toFixed(FORMAT_DECIMALS);
+        document.getElementById('newtonIterations').textContent = newtonResult.iterations;
+        document.getElementById('newtonTime').textContent = `${newtonResult.time} ms`;
+        document.getElementById('newtonResultX').textContent = newtonResult.root.toFixed(FORMAT_DECIMALS);
+        displayNewtonLog(newtonResult.log); 
+    }
+  });
+
+  document.getElementById('clearButton').addEventListener('click', () => {
+    if (chartRefs.chart1) {
+        chartRefs.chart1.destroy();
+        chartRefs.chart1 = null;
+    }
+    if (chartRefs.chart2) {
+        chartRefs.chart2.destroy();
+        chartRefs.chart2 = null;
+    }
+    
+  // 数式入力フィールドをクリア
+  document.getElementById('formulaInput').value = '';
+
+  // 2分法関連の入力と表示をクリア
+  document.getElementById('bisectionA').value = ''; 
+  document.getElementById('bisectionB').value = ''; 
+  document.getElementById('bisectionIterations').textContent = '';
+  document.getElementById('bisectionTime').textContent = '';
+  document.getElementById('bisectionResultX').textContent = '';
+
+  // ニュートン法関連の入力と表示をクリア
+  document.getElementById('newtonInitialGuess').value = ''; 
+  document.getElementById('newtonIterations').textContent = '';
+  document.getElementById('newtonTime').textContent = '';
+  document.getElementById('newtonResultX').textContent = '';
+  document.getElementById('newtonNextX').textContent = '';
+  document.getElementById('newtonTangent').textContent = '';
+
+   document.getElementById('bisectionLog').innerHTML = '<h3>2分法ログ</h3>';
+   document.getElementById('newtonLog').innerHTML = '<h3>ニュートン法ログ</h3>';
+});
+</script>
+</body>
+</html>
