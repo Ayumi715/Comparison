@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="index.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
  <style>
-    /* ★ ログ表示エリアのスタイル ★ */
+    /*  ログエリア設定　*/
         .log-area {
             flex: 1;
             max-width: 450px;
@@ -16,7 +16,7 @@
             background-color: #fff;
             box-shadow: 0 0 10px rgba(0,0,0,0.05);
             max-height: 500px;
-            overflow-y: auto; /* スクロール可能にする */
+            overflow-y: auto;
         }
         .log-area table {
             width: 100%;
@@ -39,6 +39,7 @@
 <h1>2分法とニュートン法_比較シミュレータ</h1>
 <hr>
 
+<!-- ボタン、入力欄 -->
 <div class="container">
     <div class="input-area">
         <button id="startButton" class="button-large" style="font-size: 30px; width: 100px; height: 60px;">start</button>
@@ -91,6 +92,7 @@
 </div>
 
 <hr>
+ <!-- ログ -->
 <h2>反復計算ログ</h2>
 <div class="container">
     <div class="log-area" id="bisectionLog">
@@ -102,17 +104,18 @@
 </div>
 
 <script>
-  let chart1; // 2分法グラフインスタンス
-  let chart2; // ニュートン法グラフインスタンス
+  let chart1; //2分法
+  let chart2; //ニュートン法
 
-  // 許容誤差と最大反復回数 (ログデータ表示のために再定義)
+  // 許容誤差と最大反復回数
   const TOLERANCE = 1e-2; 
   const MAX_ITERATIONS = 100;
-  
-  const FORMAT_DECIMALS = 2; // 結果表示の小数点以下の桁数
-  const LOG_DECIMALS = 2;    // ログ表示の小数点以下の桁数
 
-  // --- 計算ロジックで使用する関数と定数を再定義 ---
+　//　結果とログの桁数
+  const FORMAT_DECIMALS = 2; 
+  const LOG_DECIMALS = 2;
+
+  // --- 計算ロジックで使用する関数と定数の定義 ---
   
   function createFunction(a, b, c) {
       return function(x) {
@@ -192,7 +195,7 @@
           const fx = f(x);
           const fpx = f_prime(x);
 
-          if (Math.abs(x) > 1e10) { // 発散チェックをより厳密に
+          if (Math.abs(x) > 1e10) {
               return "計算値が発散したか、極端に大きな値になりました。初期値を変えてください。";
           }
           
@@ -229,7 +232,7 @@
           iterations: iterations,
           time: (end - start).toFixed(FORMAT_DECIMALS),
           nextX: x_new,
-          tangent: f_prime(x_new), // 最終的な接線の傾き
+          tangent: f_prime(x_new), // 傾き
           log: logData 
       };
   }
@@ -288,26 +291,24 @@
 
     const ctx = document.getElementById(canvasId).getContext('2d');
 
-    // 既存のグラフがあれば破棄（安定していたロジックをそのまま使用）
     if (chartInstanceRef.value) { 
       chartInstanceRef.value.destroy();
     }
 
-    // カスタムプラグインを定義して背景色を設定
     const backgroundPlugin = {
       id: 'customCanvasBackgroundColor',
       beforeDraw: (chart, args, options) => {
         const {ctx} = chart;
         ctx.save();
         ctx.globalCompositeOperation = 'destination-over';
-        ctx.fillStyle = options.color || '#fff'; // デフォルトは白
+        ctx.fillStyle = options.color || '#fff';
         ctx.fillRect(0, 0, chart.width, chart.height);
         ctx.restore();
       }
     };
 
-    // 新しいグラフを作成
-    const newChart = new Chart(ctx, { // chartInstanceRef.value に代入
+    // 新しいグラフ作成
+    const newChart = new Chart(ctx, {
       type: 'line',
       data: {
         labels: xValues,
@@ -329,20 +330,13 @@
             title: { display: true, text: 'x' },
             min: -100,
             max: 100,
-            //ticks: {
-              // X軸の目盛りを10刻みに設定を有効化
-              //stepSize: 10, 
-              //callback: function(value, index, values) {
-                //return value.toFixed(0);
-              //}
-            //},
             grid: {
               borderColor: 'black',
               borderWidth: 1,
               drawOnChartArea: true,
               drawTicks: true,
               tickLength: 8,
-              // 10の倍数の線は濃くする
+              // 100の倍数の線は濃くする
               color: (context) => context.tick.value === 0 ? 'black' : (context.tick.value % 10 === 0 ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.1)')
             }
           },
@@ -350,13 +344,6 @@
             title: { display: true, text: 'y' },
             min: -1000,
             max: 1000,
-            //ticks: {
-              // ★ Y軸の目盛りを100刻みに設定を有効化 ★ (広い範囲に対応)
-              //stepSize: 100,
-              //callback: function(value, index, values) {
-                //return value.toFixed(0);
-              //}
-            //},
             grid: {
               borderColor: 'black',
               borderWidth: 1,
@@ -372,13 +359,11 @@
           legend: {
             display: true
           },
-          // カスタム背景プラグインのオプションを設定
           customCanvasBackgroundColor: {
-            color: backgroundColor // グラフ描画領域の背景色
+            color: backgroundColor
           }
         }
       },
-      // プラグインを登録
       plugins: [backgroundPlugin]
     });
     
@@ -437,8 +422,7 @@
       document.getElementById('newtonLog').innerHTML = html;
   }
   
-  // --- イベントリスナーの修正 ---
-
+  // --- イベントリスナー ---
   const chartRefs = {
       chart1: null,
       chart2: null
@@ -551,4 +535,5 @@
 </script>
 </body>
 </html>
+
 
