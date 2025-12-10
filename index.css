@@ -1,7 +1,7 @@
 body {
     font-family: sans-serif;
     padding: 20px;
-    background-color: rgb(238, 255, 0); /* 元のCSSから */
+    background-color: rgb(238, 255, 0);
 }
 .container {
     display: flex;
@@ -51,13 +51,13 @@ canvas {
     border: 2px solid rgb(47, 255, 127);
     background-color: rgb(47, 255, 127);
 }
-/* ★ 最終ステップの行に適用するスタイル ★ */
+
 .log-area table tr.final-step {
-    background-color: #FFFF99; /* 明るい黄色 */
-    font-weight: bold; /* フォントを太字にする */
+    background-color: #FFFF99;
+    font-weight: bold;
 }
 
 .log-area table tr.final-step td {
-    /* 最後の行のセルだけ、境界線を少し濃くするなどの調整も可能 */
     border-color: #AAAA00; 
 }
+
